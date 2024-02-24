@@ -1,0 +1,11 @@
+[Unit]
+Description=Promtail
+After=network.target
+
+[Service]
+ExecStart=promtail --config.file=/home/admin/promtail-local-config.yaml
+WorkingDirectory=/home/admin
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
