@@ -1,0 +1,20 @@
+- name: Install Grafana
+  hosts: grafana
+
+  tasks:
+  - name: Copy grafana deb package from local
+    copy:
+      src: ./resources/grafana-enterprise_10.3.3_amd64.deb
+      dest: /home/admin/
+
+  - name: Install Grafana
+    apt:
+      deb: /home/admin/grafana-enterprise_10.3.3_amd64.deb
+    become: true
+
+
+  - name: Make sure a grafana-server is running
+    systemd_service:
+      state: started
+      name: grafana-server
+    become: true
