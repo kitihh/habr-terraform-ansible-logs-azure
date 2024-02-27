@@ -3,7 +3,7 @@ Description=Promtail
 After=network.target
 
 [Service]
-ExecStart=promtail --config.file=/home/admin/promtail-local-config.yaml
+ExecStart=promtail --config.file=/home/admin/promtail-config.yml
 WorkingDirectory=/home/admin
 Restart=always
 

@@ -3,7 +3,7 @@ resource "yandex_compute_disk" "disks-for-logs" {
 
   block_size = 4096
   image_id   = "fd8b24tqvq7t2f8a1o1s"
-  size       = 5
+  size       = 10
   type       = "network-ssd"
 }
 

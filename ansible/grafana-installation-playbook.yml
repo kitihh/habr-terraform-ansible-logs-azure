@@ -2,6 +2,11 @@
   hosts: grafana
 
   tasks:
+  - name: Install musl
+    apt:
+      name: musl 
+    become: true
+
   - name: Copy grafana deb package from local
     copy:
       src: ./resources/grafana-enterprise_10.3.3_amd64.deb
@@ -17,4 +22,5 @@
     systemd_service:
       state: started
       name: grafana-server
+      enabled: true 
     become: true
