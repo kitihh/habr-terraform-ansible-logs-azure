@@ -1,0 +1,216 @@
+apiVersion: 1
+
+contactPoints:
+    - orgId: 1
+      name: Telegram
+      receivers:
+        - uid: b43237de-126f-46f6-b8db-14f87dc79827
+          type: telegram
+          settings:
+            bottoken: 7083553047:AAFdW0IXimGUE-rlALTxbUviMdgSg75HA7E
+            chatid: "-1002141029691"
+            disable_notification: false
+            disable_web_page_preview: false
+            message: |-
+                {{ if gt (len .Alerts) 0 }}
+                {{ range .Alerts }}
+                {{ if .Labels.node_name }}
+                Alertname: {{ .Labels.alertname }}
+                Status: {{ .Labels.status }}
+                Node name: {{ .Labels.node_name }}
+                From: {{ .Labels.client_ip }}:{{ .Labels.client_port }}
+                To: {{ .Labels.user }}@{{ .Labels.node_ip }}
+                {{ else }}
+                {{ range .Labels.SortedPairs }}
+                The name of the label is {{ .Name }}, and the value is {{ .Value }}
+                {{ end }}
+                {{ end }}
+                {{ end }}
+                {{ end }}
+            protect_content: false
+          disableResolveMessage: true
+
+
+policies:
+    - orgId: 1
+      receiver: grafana-default-email
+      group_by:
+        - grafana_folder
+        - alertname
+      routes:
+        - receiver: Telegram
+          object_matchers:
+            - - telegram
+              - =
+              - test
+
+groups:
+    - orgId: 1
+      name: default
+      folder: default
+      interval: 10s
+      rules:
+        - uid: ab455f80-57fb-408a-b9a7-6790bf199757
+          title: SSH Connection Accepted
+          condition: C
+          data:
+            - refId: A
+              queryType: range
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: a8464a21-facc-484e-9e71-288c69dce082
+              model:
+                editorMode: code
+                expr: '(count_over_time({filename="/var/log/auth.log"} |= `Accepted publickey` | pattern `<_> sshd[<_>]: <status> publickey for <user> from <client_ip> port <client_port> <_>` [1s]))'
+                intervalMs: 1000
+                maxDataPoints: 43200
+                queryType: range
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10s
+          annotations:
+            description: Bla Bla Bla
+            summary: SSH Connection is Accepted
+          labels:
+            telegram: test
+          isPaused: false
+        - uid: b0d8c288-b797-47eb-97b5-c609613b4239
+          title: SSH Connection Denied
+          condition: C
+          data:
+            - refId: A
+              queryType: range
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: a8464a21-facc-484e-9e71-288c69dce082
+              model:
+                editorMode: code
+                expr: 'count_over_time({filename="/var/log/auth.log"} |= `Connection closed by authenticating` != `root` | pattern `<_> sshd[<_>]: Connection <status> by authenticating user <user> <client_ip> port <client_port> <_>` [1s])'
+                intervalMs: 1000
+                maxDataPoints: 43200
+                queryType: range
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 60
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 10s
+          annotations:
+            description: Bla Bla Bla
+            summary: SSH Connection is Denied
+          labels:
+            telegram: test
+          isPaused: false
