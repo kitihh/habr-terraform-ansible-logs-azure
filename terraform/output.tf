@@ -1,15 +1,10 @@
-output "grafana_ip_address" {
-    value = yandex_compute_instance.grafana.network_interface.0.nat_ip_address
+output "grafana_public_ip" {
+  value = azurerm_public_ip.pip["grafana"].ip_address
 }
 
-output "node1_ip_address" {
-    value = yandex_compute_instance.node1.network_interface.0.nat_ip_address
-}
-
-output "node2_ip_address" {
-    value = yandex_compute_instance.node2.network_interface.0.nat_ip_address
-}
-
-output "node3_ip_address" {
-    value = yandex_compute_instance.node3.network_interface.0.nat_ip_address
+output "node_public_ips" {
+  value = {
+    for k, v in azurerm_public_ip.pip : k => v.ip_address
+    if k != "grafana"
+  }
 }

@@ -1,7 +1,22 @@
-variable "default_ru_central1_a_subnet_cidr_block" {
-  default = "10.128.0.0/24"
+variable "location" {
+  description = "Azure region"
+  type        = string
+  default     = "eastus"
 }
 
-variable "default_zone_id" {
-  default = "ru-central1-a"
+variable "environment" {
+  description = "Environment name"
+  type        = string
+  default     = "dev"
+}
+
+variable "admin_username" {
+  description = "Admin username for VMs"
+  type        = string
+  default     = "azureuser"
+}
+
+variable "ssh_public_key" {
+  description = "SSH public key for VM authentication"
+  type        = string
 }

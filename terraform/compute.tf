@@ -1,208 +1,89 @@
-resource "yandex_compute_disk" "disks-for-logs" {
-  count = 4
-
-  block_size = 4096
-  image_id   = "fd8b24tqvq7t2f8a1o1s"
-  size       = 10
-  type       = "network-ssd"
+# Resource Group
+resource "azurerm_resource_group" "rg" {
+  name     = "rg-${var.environment}-monitoring"
+  location = var.location
 }
 
-resource "yandex_compute_instance" "grafana" {
-  hostname                  = "grafana"
-  name                      = "grafana"
-  network_acceleration_type = "standard"
-  platform_id               = "standard-v2"
-  service_account_id        = yandex_iam_service_account.compute-editor.id
-
-  scheduling_policy {
-    preemptible = true
-  }
-
-  metadata = {
-    install-unified-agent = "0"
-    ssh-keys              = "admin:${file("~/.ssh/habr-logs/grafana.pub")}"
-    user-data             = <<-EOT
-      #cloud-config
-      datasource:
-        Ec2:
-          strict_id: false
-      ssh_pwauth: no
-      users:
-      - name: admin
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        shell: /bin/bash
-        ssh_authorized_keys:
-        - ${file("~/.ssh/habr-logs/grafana.pub")}
-      EOT
-  }
-
-  boot_disk {
-    auto_delete = true
-    device_name = yandex_compute_disk.disks-for-logs[0].name
-    disk_id     = yandex_compute_disk.disks-for-logs[0].id
-    mode        = "READ_WRITE"
-  }
-
-  network_interface {
-    subnet_id =    yandex_vpc_subnet.default-ruc1-a.id
-    ipv4           = true
-    nat            = true
-  }
-
-  resources {
-    core_fraction = 5
-    cores         = 2
-    gpus          = 0
-    memory        = 2
+# VMs and their components
+locals {
+  vm_configs = {
+    grafana = {
+      size     = "Standard_B1s" # Cost-effective size
+      priority = "Spot"
+    }
+    node1 = {
+      size     = "Standard_B1s"
+      priority = "Spot"
+    }
+    node2 = {
+      size     = "Standard_B1s"
+      priority = "Spot"
+    }
+    node3 = {
+      size     = "Standard_B1s"
+      priority = "Spot"
+    }
   }
 }
 
-resource "yandex_compute_instance" "node1" {
-  hostname                  = "node1"
-  name                      = "node1"
-  network_acceleration_type = "standard"
-  platform_id               = "standard-v2"
-  service_account_id        = yandex_iam_service_account.compute-editor.id
+# Managed Disks
+resource "azurerm_managed_disk" "disk" {
+  for_each             = local.vm_configs
+  name                 = "disk-${var.environment}-${each.key}"
+  location             = azurerm_resource_group.rg.location
+  resource_group_name  = azurerm_resource_group.rg.name
+  storage_account_type = "Standard_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = 2
+}
 
-  scheduling_policy {
-    preemptible = true
+# Virtual Machines
+resource "azurerm_virtual_machine" "vm" {
+  for_each              = local.vm_configs
+  name                  = "vm-${var.environment}-${each.key}"
+  location              = azurerm_resource_group.rg.location
+  resource_group_name   = azurerm_resource_group.rg.name
+  vm_size               = each.value.size
+  network_interface_ids = [azurerm_network_interface.nic[each.key].id]
+
+  # VM Priority (Spot)
+  # priority        = each.value.priority
+  # eviction_policy = "Deallocate"
+  # max_bid_price   = -1
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts"
+    version   = "latest"
   }
 
-  metadata = {
-    install-unified-agent = "0"
-    ssh-keys              = "admin:${file("~/.ssh/habr-logs/node1.pub")}"
-    user-data             = <<-EOT
-      #cloud-config
-      datasource:
-        Ec2:
-          strict_id: false
-      ssh_pwauth: no
-      users:
-      - name: admin
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        shell: /bin/bash
-        ssh_authorized_keys:
-        - ${file("~/.ssh/habr-logs/node1.pub")}
-      EOT
+  storage_os_disk {
+    name              = "osdisk-${var.environment}-${each.key}"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
   }
 
-  boot_disk {
-    auto_delete = true
-    device_name = yandex_compute_disk.disks-for-logs[1].name
-    disk_id     = yandex_compute_disk.disks-for-logs[1].id
-    mode        = "READ_WRITE"
+  os_profile {
+    computer_name  = "vm-${var.environment}-${each.key}"
+    admin_username = var.admin_username
   }
 
-  network_interface {
-    subnet_id =    yandex_vpc_subnet.default-ruc1-a.id
-    ipv4           = true
-    nat            = true
-  }
-
-  resources {
-    core_fraction = 5
-    cores         = 2
-    gpus          = 0
-    memory        = 2
+  os_profile_linux_config {
+    disable_password_authentication = true
+    ssh_keys {
+      path     = "/home/${var.admin_username}/.ssh/authorized_keys"
+      key_data = var.ssh_public_key
+    }
   }
 }
 
-resource "yandex_compute_instance" "node2" {
-  hostname                  = "node2"
-  name                      = "node2"
-  network_acceleration_type = "standard"
-  platform_id               = "standard-v2"
-  service_account_id        = yandex_iam_service_account.compute-editor.id
-
-  scheduling_policy {
-    preemptible = true
-  }
-
-  metadata = {
-    install-unified-agent = "0"
-    ssh-keys              = "admin:${file("~/.ssh/habr-logs/node2.pub")}"
-    user-data             = <<-EOT
-      #cloud-config
-      datasource:
-        Ec2:
-          strict_id: false
-      ssh_pwauth: no
-      users:
-      - name: admin
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        shell: /bin/bash
-        ssh_authorized_keys:
-        - ${file("~/.ssh/habr-logs/node2.pub")}
-      EOT
-  }
-
-  boot_disk {
-    auto_delete = true
-    device_name = yandex_compute_disk.disks-for-logs[2].name
-    disk_id     = yandex_compute_disk.disks-for-logs[2].id
-    mode        = "READ_WRITE"
-  }
-
-  network_interface {
-    subnet_id =    yandex_vpc_subnet.default-ruc1-a.id
-    ipv4           = true
-    nat            = true
-  }
-
-  resources {
-    core_fraction = 5
-    cores         = 2
-    gpus          = 0
-    memory        = 2
-  }
-}
-
-resource "yandex_compute_instance" "node3" {
-  hostname                  = "node3"
-  name                      = "node3"
-  network_acceleration_type = "standard"
-  platform_id               = "standard-v2"
-  service_account_id        = yandex_iam_service_account.compute-editor.id
-
-  scheduling_policy {
-    preemptible = true
-  }
-
-  metadata = {
-    install-unified-agent = "0"
-    ssh-keys              = "admin:${file("~/.ssh/habr-logs/node3.pub")}"
-    user-data             = <<-EOT
-      #cloud-config
-      datasource:
-        Ec2:
-          strict_id: false
-      ssh_pwauth: no
-      users:
-      - name: admin
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        shell: /bin/bash
-        ssh_authorized_keys:
-        - ${file("~/.ssh/habr-logs/node3.pub")}
-      EOT
-  }
-
-  boot_disk {
-    auto_delete = true
-    device_name = yandex_compute_disk.disks-for-logs[3].name
-    disk_id     = yandex_compute_disk.disks-for-logs[3].id
-    mode        = "READ_WRITE"
-  }
-
-  network_interface {
-    subnet_id =    yandex_vpc_subnet.default-ruc1-a.id
-    ipv4           = true
-    nat            = true
-  }
-
-  resources {
-    core_fraction = 5
-    cores         = 2
-    gpus          = 0
-    memory        = 2
-  }
+# Attach managed disks to VMs
+resource "azurerm_virtual_machine_data_disk_attachment" "disk_attachment" {
+  for_each           = local.vm_configs
+  managed_disk_id    = azurerm_managed_disk.disk[each.key].id
+  virtual_machine_id = azurerm_virtual_machine.vm[each.key].id
+  lun                = 10
+  caching            = "ReadWrite"
 }
